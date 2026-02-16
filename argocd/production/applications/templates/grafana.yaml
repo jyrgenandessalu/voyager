@@ -1,0 +1,125 @@
+{{- if .Values.applications.grafana.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.applications.grafana.name }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.applications.grafana.repo }}
+    chart: {{ .Values.applications.grafana.chart }}
+    targetRevision: {{ .Values.applications.grafana.targetRevision }}
+    helm:
+      values: |
+        adminUser: admin
+        # Chart creates secret "grafana" from adminPassword; required for pod to start.
+        adminPassword: admin
+        assertNoLeakedSecrets: false
+        service:
+          type: LoadBalancer
+          annotations:
+            cloud.google.com/load-balancer-type: "Internal"
+        ingress:
+          enabled: false
+        persistence:
+          enabled: true
+          type: pvc
+          storageClassName: standard-rwo
+          accessModes: [ReadWriteOnce]
+          size: 10Gi
+        resources:
+          limits: { cpu: 1000m, memory: 2Gi }
+          requests: { cpu: 500m, memory: 1Gi }
+        replicas: 1
+        nodeSelector:
+          cloud.google.com/gke-nodepool: {{ .Values.global.nodePools.monitoring }}
+        tolerations:
+          - key: node-pool
+            operator: Equal
+            value: monitoring
+            effect: NoSchedule
+        datasources:
+          datasources.yaml:
+            apiVersion: 1
+            datasources:
+              - name: Prometheus
+                type: prometheus
+                access: proxy
+                url: http://prometheus-prometheus.monitoring.svc.cluster.local:9090
+                isDefault: true
+                editable: true
+              - name: Loki
+                type: loki
+                access: proxy
+                url: http://loki.monitoring.svc.cluster.local:3100
+                editable: true
+              - name: Google Cloud Monitoring
+                type: cloud-monitoring
+                access: proxy
+                jsonData:
+                  authenticationType: gce
+                  defaultProject: {{ .Values.global.projectId }}
+                editable: true
+        dashboardProviders:
+          dashboardproviders.yaml:
+            apiVersion: 1
+            providers:
+              - name: default
+                orgId: 1
+                folder: ''
+                type: file
+                disableDeletion: false
+                editable: true
+                options:
+                  path: /var/lib/grafana/dashboards/default
+        dashboards:
+          default:
+            kubernetes-cluster:
+              gnetId: 7249
+              revision: 1
+              datasource: Prometheus
+            node-exporter:
+              gnetId: 1860
+              revision: 27
+              datasource: Prometheus
+            postgresql:
+              gnetId: 9628
+              revision: 1
+              datasource: Prometheus
+            loki-logs:
+              gnetId: 13639
+              revision: 1
+              datasource: Loki
+        securityContext:
+          runAsUser: 472
+          fsGroup: 472
+        serviceAccount:
+          create: true
+          annotations:
+            iam.gke.io/gcp-service-account: grafana@{{ .Values.global.projectId }}.iam.gserviceaccount.com
+        env:
+          GF_SECURITY_ADMIN_PASSWORD: admin
+          GF_INSTALL_PLUGINS: ""
+        "grafana.ini":
+          server:
+            domain: grafana.{{ .Values.global.privateDomain }}
+            root_url: https://grafana.{{ .Values.global.privateDomain }}
+          log:
+            mode: console
+            level: info
+          security:
+            admin_user: admin
+            # admin_password must not be set here; use env GF_SECURITY_ADMIN_PASSWORD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.applications.grafana.namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+{{- end }}

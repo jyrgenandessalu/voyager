@@ -1,0 +1,112 @@
+{{- if .Values.applications.loki.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.applications.loki.name }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.applications.loki.repo }}
+    chart: {{ .Values.applications.loki.chart }}
+    targetRevision: {{ .Values.applications.loki.targetRevision }}
+    helm:
+      values: |
+        deploymentMode: SingleBinary
+        # Schedule all Loki pods on monitoring pool (tainted); avoids main pool and quota
+        nodeSelector:
+          cloud.google.com/gke-nodepool: {{ .Values.global.nodePools.monitoring }}
+        tolerations:
+          - key: node-pool
+            operator: Equal
+            value: monitoring
+            effect: NoSchedule
+        read:
+          replicas: 0
+        write:
+          replicas: 0
+        backend:
+          replicas: 0
+        loki:
+          auth_enabled: false
+          commonConfig:
+            replication_factor: 1
+          storage:
+            type: filesystem
+            filesystem:
+              directory: /loki/chunks
+          schemaConfig:
+            configs:
+              - from: "2024-01-01"
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: index_
+                  period: 24h
+        singleBinary:
+          enabled: true
+          replicas: 1
+          nodeSelector:
+            cloud.google.com/gke-nodepool: {{ .Values.global.nodePools.monitoring }}
+          tolerations:
+            - key: node-pool
+              operator: Equal
+              value: monitoring
+              effect: NoSchedule
+          resources:
+            limits: { cpu: 1000m, memory: 2Gi }
+            requests: { cpu: 500m, memory: 1Gi }
+          persistence:
+            enabled: true
+            storageClass: standard-rwo
+            size: 20Gi
+            accessModes: [ReadWriteOnce]
+        gateway:
+          enabled: false
+        # Reduce chunks-cache memory so it fits on monitoring pool (default ~10Gi is too large)
+        memcachedChunks:
+          resources:
+            limits: { memory: 2Gi }
+            requests: { memory: 1Gi, cpu: 250m }
+        memcachedResults:
+          resources:
+            limits: { memory: 1Gi }
+            requests: { memory: 512Mi, cpu: 100m }
+        monitoring:
+          serviceMonitor:
+            enabled: true
+            interval: 30s
+        limits_config:
+          ingestion_rate_mb: 10
+          ingestion_burst_size_mb: 20
+          max_query_length: 721h
+          max_query_parallelism: 32
+          max_streams_per_user: 10000
+          max_line_size: 256KB
+        table_manager:
+          retention_deletes_enabled: true
+          retention_period: 168h
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.applications.loki.namespace }}
+  # Chart does not expose nodeSelector/tolerations for memcached chunks-cache; ignore so manual patch persists
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      name: loki-chunks-cache
+      namespace: {{ .Values.applications.loki.namespace }}
+      jqPathExpressions:
+        - .spec.template.spec.tolerations
+        - .spec.template.spec.nodeSelector
+        - .spec.template.spec.containers[0].resources
+        - .spec.template.spec.containers[0].args
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+{{- end }}

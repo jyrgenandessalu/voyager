@@ -1,0 +1,70 @@
+{{- if .Values.applications.loki.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.applications.loki.name }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.applications.loki.repo }}
+    chart: {{ .Values.applications.loki.chart }}
+    targetRevision: {{ .Values.applications.loki.targetRevision }}
+    helm:
+      values: |
+        loki:
+          auth_enabled: false
+          commonConfig:
+            replication_factor: 1
+          storage:
+            type: filesystem
+            filesystem:
+              directory: /loki/chunks
+          schemaConfig:
+            configs:
+              - from: "2024-01-01"
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: index_
+                  period: 24h
+        singleBinary:
+          enabled: true
+          replicas: 1
+          resources:
+            limits: { cpu: 1000m, memory: 2Gi }
+            requests: { cpu: 500m, memory: 1Gi }
+          persistence:
+            enabled: true
+            storageClass: standard-rwo
+            size: 20Gi
+            accessModes: [ReadWriteOnce]
+        gateway:
+          enabled: false
+        monitoring:
+          serviceMonitor:
+            enabled: true
+            interval: 30s
+        limits_config:
+          ingestion_rate_mb: 10
+          ingestion_burst_size_mb: 20
+          max_query_length: 721h
+          max_query_parallelism: 32
+          max_streams_per_user: 10000
+          max_line_size: 256KB
+        table_manager:
+          retention_deletes_enabled: true
+          retention_period: 168h
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.applications.loki.namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+{{- end }}

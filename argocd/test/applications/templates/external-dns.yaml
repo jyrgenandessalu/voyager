@@ -1,0 +1,51 @@
+{{- if .Values.applications.externalDns.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.applications.externalDns.name }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.applications.externalDns.repo }}
+    chart: {{ .Values.applications.externalDns.chart }}
+    targetRevision: {{ .Values.applications.externalDns.targetRevision }}
+    helm:
+      values: |
+        provider: google
+        google:
+          project: {{ .Values.global.projectId }}
+        serviceAccount:
+          create: true
+          name: external-dns
+          annotations:
+            iam.gke.io/gcp-service-account: external-dns@{{ .Values.global.projectId }}.iam.gserviceaccount.com
+        domainFilters:
+          - {{ .Values.global.domain }}
+          - {{ .Values.global.publicDomain }}
+          - {{ .Values.global.privateDomain }}
+        policy: sync
+        txtOwnerId: voyager-test-external-dns
+        sources:
+          - ingress
+          - service
+        replicas: 1
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.applications.externalDns.namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+{{- end }}

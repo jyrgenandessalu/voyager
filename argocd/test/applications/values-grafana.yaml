@@ -1,0 +1,138 @@
+# Grafana - Test Environment
+# Visualization and dashboards
+
+# Admin credentials (should be changed in production)
+adminUser: admin
+adminPassword: admin  # TODO: Change to secure password or use secret
+
+# Node selector for monitoring node pool
+nodeSelector:
+  cloud.google.com/gke-nodepool: voyager-test-monitoring-pool
+
+# Service configuration (internal LB for Phase 8 - access via VPN/bastion only)
+service:
+  type: LoadBalancer
+  annotations:
+    cloud.google.com/load-balancer-type: "Internal"
+
+# Ingress configuration (optional; internal LB above is used for access)
+ingress:
+  enabled: false
+
+# Persistence
+persistence:
+  enabled: true
+  type: pvc
+  storageClassName: standard-rwo
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+
+# Resources
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+# Replica count
+replicas: 1
+
+# Data sources (configured via ConfigMap)
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      # Prometheus
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+        isDefault: true
+        editable: true
+      
+      # Loki
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki.monitoring.svc.cluster.local:3100
+        editable: true
+      
+      # Google Cloud Monitoring
+      - name: Google Cloud Monitoring
+        type: cloud-monitoring
+        access: proxy
+        jsonData:
+          authenticationType: gce
+          defaultProject: voyager-test-486811
+        editable: true
+
+# Dashboards (will be configured via ConfigMap or provisioning)
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+dashboards:
+  default:
+    # Kubernetes cluster dashboard
+    kubernetes-cluster:
+      gnetId: 7249
+      revision: 1
+      datasource: Prometheus
+    
+    # Node exporter dashboard
+    node-exporter:
+      gnetId: 1860
+      revision: 27
+      datasource: Prometheus
+    
+    # PostgreSQL dashboard (for Postgres exporter)
+    postgresql:
+      gnetId: 9628
+      revision: 1
+      datasource: Prometheus
+    
+    # Loki logs dashboard
+    loki-logs:
+      gnetId: 13639
+      revision: 1
+      datasource: Loki
+
+# Security context
+securityContext:
+  runAsUser: 472
+  fsGroup: 472
+
+# Service account for GCP monitoring
+serviceAccount:
+  create: true
+  annotations:
+    iam.gke.io/gcp-service-account: grafana@voyager-test-486811.iam.gserviceaccount.com
+
+# Environment variables
+env:
+  GF_SECURITY_ADMIN_PASSWORD: admin  # TODO: Use secret
+  GF_INSTALL_PLUGINS: ""
+
+# Additional configuration
+grafana.ini:
+  server:
+    domain: grafana.test-private.voyager-demo.xyz
+    root_url: https://grafana.test-private.voyager-demo.xyz
+  log:
+    mode: console
+    level: info
+  security:
+    admin_user: admin
+    admin_password: admin  # TODO: Use secret

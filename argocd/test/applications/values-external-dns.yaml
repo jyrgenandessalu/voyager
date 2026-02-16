@@ -1,0 +1,85 @@
+# External DNS - Test Environment
+# Automatically creates DNS records in Google Cloud DNS
+
+# Provider configuration
+provider: google
+
+# Google Cloud configuration
+google:
+  project: voyager-test-486811
+  serviceAccountSecret: "external-dns-gcp-sa"
+
+# Service account configuration
+serviceAccount:
+  create: true
+  name: external-dns
+  annotations:
+    # Workload Identity annotation for GCP
+    iam.gke.io/gcp-service-account: external-dns@voyager-test-486811.iam.gserviceaccount.com
+
+# Node selector for tools node pool
+nodeSelector:
+  cloud.google.com/gke-nodepool: voyager-test-tools-pool
+
+# Resources
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Domain filters (only manage our domains)
+domainFilters:
+  - voyager-demo.xyz
+  - test-public.voyager-demo.xyz
+  - test-private.voyager-demo.xyz
+
+# Zone filters (specific DNS zones to manage)
+zoneFilters: []
+
+# Policy for record management
+policy: sync
+
+# TXT owner ID (unique identifier for this External DNS instance)
+txtOwnerId: voyager-test-external-dns
+
+# Sources of ingress/service information
+sources:
+  - ingress
+  - service
+
+# Annotation filters
+annotationFilter: "external-dns.alpha.kubernetes.io/enabled=true"
+
+# Log level
+logLevel: info
+
+# Log format
+logFormat: json
+
+# Interval for checking for changes
+interval: 1m
+
+# Trigger loop on annotation changes
+triggerLoopOnEvent: true
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  fsGroup: 65534
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 65534
+  seccompProfile:
+    type: RuntimeDefault
+
+# Replica count
+replicas: 1
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: false  # Single replica, no PDB needed

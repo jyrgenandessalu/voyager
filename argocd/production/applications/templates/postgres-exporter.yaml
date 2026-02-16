@@ -1,0 +1,50 @@
+{{- if .Values.applications.postgresExporter.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.applications.postgresExporter.name }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.applications.postgresExporter.repo }}
+    chart: {{ .Values.applications.postgresExporter.chart }}
+    targetRevision: {{ .Values.applications.postgresExporter.targetRevision }}
+    helm:
+      values: |
+        config:
+          datasource:
+            host: {{ .Values.applications.postgresExporter.dbHost | quote }}
+            port: "5432"
+            database: {{ .Values.applications.postgresExporter.dbName | default "postgres" | quote }}
+            userSecret:
+              name: postgres-exporter-db
+              key: user
+            passwordSecret:
+              name: postgres-exporter-db
+              key: password
+            sslmode: disable
+        serviceMonitor:
+          enabled: true
+        nodeSelector:
+          cloud.google.com/gke-nodepool: {{ .Values.global.nodePools.monitoring }}
+        tolerations:
+          - key: node-pool
+            operator: Equal
+            value: monitoring
+            effect: NoSchedule
+        resources:
+          limits: { cpu: 100m, memory: 128Mi }
+          requests: { cpu: 50m, memory: 64Mi }
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .Values.applications.prometheus.namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+{{- end }}

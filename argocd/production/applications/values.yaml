@@ -1,0 +1,107 @@
+# ArgoCD App of Apps - Production Environment
+
+global:
+  environment: prod
+  domain: voyager-demo.xyz
+  publicDomain: prod-public.voyager-demo.xyz
+  privateDomain: prod-private.voyager-demo.xyz
+  projectId: voyager-production-486811
+  region: europe-north1
+  clusterName: voyager-prod
+  nodePools:
+    monitoring: voyager-prod-monitoring-pool
+    tools: voyager-prod-tools-pool
+    main: voyager-prod-main-pool
+
+applications:
+  externalSecrets:
+    enabled: true
+    name: external-secrets
+    namespace: external-secrets
+    chart: external-secrets
+    repo: https://charts.external-secrets.io
+    version: 0.10.0
+    targetRevision: 0.10.0
+
+  externalDns:
+    enabled: true
+    name: external-dns
+    namespace: external-dns
+    chart: external-dns
+    repo: https://kubernetes-sigs.github.io/external-dns/
+    version: 1.14.0
+    targetRevision: 1.14.0
+
+  frontend:
+    enabled: false
+    name: frontend
+    namespace: sample-app
+    path: sample-app/frontend/helm
+    repo: https://gitlab.com/jandessalu-kood/voyager.git
+    targetRevision: main
+    valuesFile: values-prod.yaml
+
+  # Monitoring stack (requirements 57-65)
+  prometheus:
+    enabled: true
+    name: prometheus
+    namespace: monitoring
+    chart: kube-prometheus-stack
+    repo: https://prometheus-community.github.io/helm-charts
+    version: 59.0.0
+    targetRevision: "59.0.0"
+    # Webhook URLs for Alertmanager. Do not commit real URLs; use a secret or override (see docs/ALERTING_SETUP.md).
+    # Slack: https://api.slack.com/messaging/webhooks
+    alertmanagerWebhookUrl: ""
+    # Discord: Server settings → Integrations → Webhooks (optional; payload may show as JSON unless using an adapter)
+    alertmanagerDiscordWebhookUrl: ""
+
+  postgresExporterDb:
+    enabled: true
+    repo: https://gitlab.com/jandessalu-kood/voyager.git
+
+  postgresExporter:
+    enabled: true
+    name: prometheus-postgres-exporter
+    namespace: monitoring
+    chart: prometheus-postgres-exporter
+    repo: https://prometheus-community.github.io/helm-charts
+    targetRevision: "6.4.0"
+    dbHost: db.prod-private.voyager-demo.xyz
+    dbName: postgres
+
+  loki:
+    enabled: true
+    name: loki
+    namespace: monitoring
+    chart: loki
+    repo: https://grafana.github.io/helm-charts
+    version: 6.12.0
+    targetRevision: "6.12.0"
+
+  promtail:
+    enabled: true
+    name: promtail
+    namespace: monitoring
+    chart: promtail
+    repo: https://grafana.github.io/helm-charts
+    version: 6.15.0
+    targetRevision: "6.15.0"
+
+  grafana:
+    enabled: true
+    name: grafana
+    namespace: monitoring
+    chart: grafana
+    repo: https://grafana.github.io/helm-charts
+    version: 7.3.0
+    targetRevision: "7.3.0"
+
+  backend:
+    enabled: false
+    name: backend
+    namespace: sample-app
+    path: sample-app/backend/helm
+    repo: https://gitlab.com/jandessalu-kood/voyager.git
+    targetRevision: main
+    valuesFile: values-prod.yaml

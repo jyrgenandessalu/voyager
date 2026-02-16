@@ -1,0 +1,71 @@
+# Loki - Test Environment
+# Log aggregation system
+
+# Node selector for monitoring node pool
+nodeSelector:
+  cloud.google.com/gke-nodepool: voyager-test-monitoring-pool
+
+# Loki configuration
+loki:
+  auth_enabled: false  # No authentication for test
+  commonConfig:
+    replication_factor: 1  # Single replica for test
+  storage:
+    type: filesystem
+    filesystem:
+      directory: /loki/chunks
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+
+# Single binary mode (simpler for test)
+singleBinary:
+  enabled: true
+  replicas: 1
+  
+  # Resources
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  
+  # Storage
+  persistence:
+    enabled: true
+    storageClass: standard-rwo
+    size: 20Gi
+    accessModes:
+      - ReadWriteOnce
+
+# Gateway (optional, for multi-tenant)
+gateway:
+  enabled: false
+
+# Monitoring
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+
+# Limits configuration
+limits_config:
+  ingestion_rate_mb: 10
+  ingestion_burst_size_mb: 20
+  max_query_length: 721h
+  max_query_parallelism: 32
+  max_streams_per_user: 10000
+  max_line_size: 256KB
+
+# Retention
+table_manager:
+  retention_deletes_enabled: true
+  retention_period: 168h  # 7 days for test

@@ -1,0 +1,117 @@
+# ArgoCD App of Apps - Test Environment
+# This chart defines all ArgoCD applications for the test environment
+
+global:
+  environment: test
+  domain: voyager-demo.xyz
+  publicDomain: test-public.voyager-demo.xyz
+  privateDomain: test-private.voyager-demo.xyz
+  
+  # GCP Configuration
+  projectId: voyager-test-486811
+  region: europe-north1
+  
+  # Node Pool Selectors
+  nodePools:
+    monitoring: voyager-test-monitoring-pool
+    tools: voyager-test-tools-pool
+    main: voyager-test-main-pool
+
+# Application definitions
+applications:
+  # External Secrets - Must be installed first
+  externalSecrets:
+    enabled: true
+    # Note: ClusterSecretStore will be created after External Secrets is installed
+    name: external-secrets
+    namespace: external-secrets
+    chart: external-secrets
+    repo: https://charts.external-secrets.io
+    version: 0.10.0
+    targetRevision: 0.10.0
+    
+  # External DNS - Depends on External Secrets
+  externalDns:
+    enabled: true
+    name: external-dns
+    namespace: external-dns
+    chart: external-dns
+    repo: https://kubernetes-sigs.github.io/external-dns/
+    version: 1.14.0
+    targetRevision: 1.14.0
+    
+  # Prometheus - Monitoring stack
+  prometheus:
+    enabled: true
+    name: prometheus
+    namespace: monitoring
+    chart: kube-prometheus-stack
+    repo: https://prometheus-community.github.io/helm-charts
+    version: 59.0.0
+    targetRevision: 59.0.0
+
+  # Postgres Exporter DB secret (ExternalSecret in monitoring namespace)
+  postgresExporterDb:
+    enabled: true
+    repo: https://gitlab.com/jandessalu-kood/voyager.git
+
+  # Prometheus Postgres Exporter
+  postgresExporter:
+    enabled: true
+    name: prometheus-postgres-exporter
+    namespace: monitoring
+    chart: prometheus-postgres-exporter
+    repo: https://prometheus-community.github.io/helm-charts
+    targetRevision: 6.4.0
+    dbHost: db.test-private.voyager-demo.xyz
+    dbName: postgres
+    
+  # Loki - Log aggregation
+  loki:
+    enabled: true
+    name: loki
+    namespace: monitoring
+    chart: loki
+    repo: https://grafana.github.io/helm-charts
+    version: 6.12.0
+    targetRevision: 6.12.0
+    
+  # Promtail - Log collection
+  promtail:
+    enabled: true
+    name: promtail
+    namespace: monitoring
+    chart: promtail
+    repo: https://grafana.github.io/helm-charts
+    version: 6.15.0
+    targetRevision: 6.15.0
+    
+  # Grafana - Visualization
+  grafana:
+    enabled: true
+    name: grafana
+    namespace: monitoring
+    chart: grafana
+    repo: https://grafana.github.io/helm-charts
+    version: 7.3.0
+    targetRevision: 7.3.0
+
+  # Frontend Application (disabled – sample-app taken down)
+  frontend:
+    enabled: false
+    name: frontend
+    namespace: sample-app
+    path: sample-app/frontend/helm
+    repo: https://gitlab.com/jandessalu-kood/voyager.git
+    targetRevision: main
+    valuesFile: values-test.yaml
+
+  # Backend Application (disabled – sample-app taken down)
+  backend:
+    enabled: false
+    name: backend
+    namespace: sample-app
+    path: sample-app/backend/helm
+    repo: https://gitlab.com/jandessalu-kood/voyager.git
+    targetRevision: main
+    valuesFile: values-test.yaml
