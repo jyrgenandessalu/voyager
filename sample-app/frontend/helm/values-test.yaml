@@ -1,0 +1,37 @@
+# Test environment values for frontend
+replicaCount: 1
+
+image:
+  repository: europe-north1-docker.pkg.dev/voyager-shared-486811/voyager-registry-frontend/frontend
+  tag: "latest"
+
+ingress:
+  enabled: true
+  managedCertificateName: frontend-test-cert
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: frontend.test-public.voyager-demo.xyz
+    external-dns.alpha.kubernetes.io/enabled: "true"
+    kubernetes.io/ingress.class: "gce"
+    networking.gke.io/managed-certificates: frontend-test-cert
+  hosts:
+    - host: frontend.test-public.voyager-demo.xyz
+      paths:
+        - path: /
+          pathType: Prefix
+
+# Mandatory: sample application runs on main node pool (not tools)
+resources:
+  limits:
+    cpu: 250m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+nodeSelector:
+  cloud.google.com/gke-nodepool: voyager-test-main-pool
+tolerations: []
+apiUrl: "https://backend.test-public.voyager-demo.xyz"
+
+configMap:
+  enabled: true
+  name: frontend-config

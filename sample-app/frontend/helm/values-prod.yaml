@@ -1,0 +1,47 @@
+# Production environment values for frontend
+replicaCount: 2
+
+image:
+  repository: europe-north1-docker.pkg.dev/voyager-shared-486811/voyager-registry-frontend/frontend
+  tag: "latest"
+
+ingress:
+  enabled: true
+  managedCertificateName: frontend-prod-cert
+  # Request cert only for www so it goes Active (frontend.prod-public often fails Google validation from their side)
+  managedCertificateDomains:
+    - www.voyager-demo.xyz
+  annotations:
+    # Root domain (www) per mandatory requirement; subdomain for API clarity
+    external-dns.alpha.kubernetes.io/hostname: www.voyager-demo.xyz,frontend.prod-public.voyager-demo.xyz
+    external-dns.alpha.kubernetes.io/enabled: "true"
+    kubernetes.io/ingress.class: "gce"
+    networking.gke.io/managed-certificates: frontend-prod-cert
+  hosts:
+    - host: www.voyager-demo.xyz
+      paths:
+        - path: /
+          pathType: Prefix
+    - host: frontend.prod-public.voyager-demo.xyz
+      paths:
+        - path: /
+          pathType: Prefix
+
+# Mandatory: sample application runs on main node pool (not tools)
+resources:
+  limits:
+    cpu: 256m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+nodeSelector:
+  cloud.google.com/gke-nodepool: voyager-prod-main-pool
+tolerations: []
+
+apiUrl: "https://backend.prod-public.voyager-demo.xyz"
+
+configMap:
+  enabled: true
+  name: frontend-config

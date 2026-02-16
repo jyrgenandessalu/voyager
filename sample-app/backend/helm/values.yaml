@@ -1,0 +1,96 @@
+# Default values for backend
+replicaCount: 1
+
+image:
+  repository: europe-north1-docker.pkg.dev/voyager-shared-486811/voyager-registry-backend/backend
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: false
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  className: "gce"
+  managedCertificateName: ""  # set in values-test.yaml / values-prod.yaml
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: backend.test-public.voyager-demo.xyz
+    external-dns.alpha.kubernetes.io/enabled: "true"
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: ""
+    networking.gke.io/managed-certificates: backend-test-cert
+  hosts:
+    - host: backend.test-public.voyager-demo.xyz
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector:
+  cloud.google.com/gke-nodepool: voyager-test-main-pool
+
+tolerations: []
+
+affinity: {}
+
+# Database configuration
+database:
+  host: db.test-private.voyager-demo.xyz
+  port: 5432
+  name: voyager
+  user: voyager
+  # Password will come from External Secrets
+
+# External Secrets configuration
+externalSecrets:
+  enabled: true
+  secretStore: gcp-secret-manager
+  secretName: backend-db-credentials
+  secretKey: db-connection-string
+  # GCP Secret Manager key names (override in values-prod.yaml)
+  dbUserKey: test-db-user
+  dbPasswordKey: test-db-password
+  jwtKeyKey: test-jwt-key
+
+# Environment variables (SERVER_PORT must be address like :8080 for Fiber Listen)
+env:
+  SERVER_PORT: ":8080"
+  POSTGRES_DB: "voyager"
+  POSTGRES_SERVER_HOST: "db.test-private.voyager-demo.xyz"
+  RUN_MIGRATION: "true"
+  ENV: "test"
+
+# Client URL (frontend URL)
+clientUrl: "https://frontend.test-public.voyager-demo.xyz"
+
+# JWT Key (should come from secret)
+jwtKey: ""

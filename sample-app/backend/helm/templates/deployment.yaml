@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "backend.fullname" . }}
+  labels:
+    {{- include "backend.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "backend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "backend.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "backend.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: SERVER_PORT
+              value: {{ .Values.env.SERVER_PORT | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.env.POSTGRES_DB | quote }}
+            - name: POSTGRES_SERVER_HOST
+              value: {{ .Values.env.POSTGRES_SERVER_HOST | quote }}
+            - name: RUN_MIGRATION
+              value: {{ .Values.env.RUN_MIGRATION | quote }}
+            - name: ENV
+              value: {{ .Values.env.ENV | quote }}
+            - name: CLIENT_URL
+              value: {{ .Values.clientUrl | quote }}
+            {{- if .Values.allowedOrigins }}
+            - name: ALLOWED_ORIGINS
+              value: {{ .Values.allowedOrigins | quote }}
+            {{- end }}
+            {{- if .Values.externalSecrets.enabled }}
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.secretName }}
+                  key: db-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.secretName }}
+                  key: db-password
+            - name: JWT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.externalSecrets.secretName }}
+                  key: jwt-key
+            {{- else }}
+            - name: POSTGRES_USER
+              value: {{ .Values.database.user | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "backend.fullname" . }}-db-secret
+                  key: password
+            {{- end }}
+            {{- if and (not .Values.externalSecrets.enabled) .Values.jwtKey }}
+            - name: JWT_KEY
+              value: {{ .Values.jwtKey | quote }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /api/ping
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/ping
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if or (eq (.Values.env.ENV | toString) "test") (eq (.Values.env.ENV | toString) "production") }}
+          volumeMounts:
+            - name: env-file
+              mountPath: {{ if eq (.Values.env.ENV | toString) "test" }}/.env.test{{ else }}/.env{{ end }}
+              subPath: {{ if eq (.Values.env.ENV | toString) "test" }}.env.test{{ else }}.env{{ end }}
+              readOnly: true
+          {{- end }}
+      {{- if or (eq (.Values.env.ENV | toString) "test") (eq (.Values.env.ENV | toString) "production") }}
+      volumes:
+        - name: env-file
+          configMap:
+            name: {{ include "backend.fullname" . }}-env-file
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

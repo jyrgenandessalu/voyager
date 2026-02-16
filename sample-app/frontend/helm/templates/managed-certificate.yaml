@@ -1,0 +1,22 @@
+{{- if and .Values.ingress.enabled .Values.ingress.managedCertificateName -}}
+{{- $domains := .Values.ingress.managedCertificateDomains | default list }}
+{{- if not (len $domains) }}
+{{- $domains = list }}
+{{- range .Values.ingress.hosts }}
+{{- $domains = append $domains .host }}
+{{- end }}
+{{- end }}
+{{- if len $domains }}
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: {{ .Values.ingress.managedCertificateName }}
+  labels:
+    {{- include "frontend.labels" . | nindent 4 }}
+spec:
+  domains:
+    {{- range $domains }}
+    - {{ . | quote }}
+    {{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,34 @@
+# Provides env file so the backend app finds it. ENV=test -> /.env.test, ENV=production -> /.env
+# Real secret values come from deployment env/secretKeyRef; this file only needs to exist.
+{{- if eq (.Values.env.ENV | toString) "test" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "backend.fullname" . }}-env-file
+  labels:
+    {{- include "backend.labels" . | nindent 4 }}
+data:
+  ".env.test": |
+    POSTGRES_DB={{ .Values.env.POSTGRES_DB | default "voyager" }}
+    POSTGRES_SERVER_HOST={{ .Values.env.POSTGRES_SERVER_HOST | quote }}
+    CLIENT_URL={{ .Values.clientUrl | quote }}
+    SERVER_PORT={{ .Values.env.SERVER_PORT | default ":8080" }}
+    RUN_MIGRATION={{ .Values.env.RUN_MIGRATION | default "true" }}
+    ENV=test
+{{- end }}
+{{- if eq (.Values.env.ENV | toString) "production" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "backend.fullname" . }}-env-file
+  labels:
+    {{- include "backend.labels" . | nindent 4 }}
+data:
+  ".env": |
+    POSTGRES_DB={{ .Values.env.POSTGRES_DB | default "voyager" }}
+    POSTGRES_SERVER_HOST={{ .Values.env.POSTGRES_SERVER_HOST | quote }}
+    CLIENT_URL={{ .Values.clientUrl | quote }}
+    SERVER_PORT={{ .Values.env.SERVER_PORT | default ":8080" }}
+    RUN_MIGRATION={{ .Values.env.RUN_MIGRATION | default "true" }}
+    ENV=production
+{{- end }}

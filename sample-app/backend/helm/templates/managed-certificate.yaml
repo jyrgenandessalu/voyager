@@ -1,0 +1,13 @@
+{{- if and .Values.ingress.enabled .Values.ingress.managedCertificateName (len .Values.ingress.hosts) -}}
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: {{ .Values.ingress.managedCertificateName }}
+  labels:
+    {{- include "backend.labels" . | nindent 4 }}
+spec:
+  domains:
+    {{- range .Values.ingress.hosts }}
+    - {{ .host | quote }}
+    {{- end }}
+{{- end }}

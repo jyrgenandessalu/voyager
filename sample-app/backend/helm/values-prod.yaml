@@ -1,0 +1,50 @@
+# Production environment values for backend
+replicaCount: 2
+
+image:
+  repository: europe-north1-docker.pkg.dev/voyager-shared-486811/voyager-registry-backend/backend
+  tag: "latest"
+  pullPolicy: Always  # so pods always pull latest after pipeline pushes
+
+ingress:
+  enabled: true
+  managedCertificateName: backend-prod-cert
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: backend.prod-public.voyager-demo.xyz
+    external-dns.alpha.kubernetes.io/enabled: "true"
+    kubernetes.io/ingress.class: "gce"
+    networking.gke.io/managed-certificates: backend-prod-cert
+  hosts:
+    - host: backend.prod-public.voyager-demo.xyz
+      paths:
+        - path: /
+          pathType: Prefix
+
+# Mandatory: sample application runs on main node pool (not tools)
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+nodeSelector:
+  cloud.google.com/gke-nodepool: voyager-prod-main-pool
+tolerations: []
+
+env:
+  ENV: "production"
+  POSTGRES_SERVER_HOST: "db.prod-private.voyager-demo.xyz"
+
+clientUrl: "https://frontend.prod-public.voyager-demo.xyz"
+# CORS: allow www and frontend subdomain (HTTPS and HTTP so it works while frontend cert is Provisioning)
+allowedOrigins: "https://www.voyager-demo.xyz, https://frontend.prod-public.voyager-demo.xyz, http://www.voyager-demo.xyz, http://frontend.prod-public.voyager-demo.xyz"
+
+externalSecrets:
+  enabled: true
+  secretStore: gcp-secret-manager
+  secretName: backend-db-credentials
+  dbUserKey: prod-db-user
+  dbPasswordKey: prod-db-password
+  jwtKeyKey: prod-jwt-key

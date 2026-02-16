@@ -1,0 +1,42 @@
+# Test environment values for backend
+replicaCount: 1
+
+image:
+  repository: europe-north1-docker.pkg.dev/voyager-shared-486811/voyager-registry-backend/backend
+  tag: "latest"
+
+ingress:
+  enabled: true
+  managedCertificateName: backend-test-cert
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: backend.test-public.voyager-demo.xyz
+    external-dns.alpha.kubernetes.io/enabled: "true"
+    kubernetes.io/ingress.class: "gce"
+    networking.gke.io/managed-certificates: backend-test-cert
+  hosts:
+    - host: backend.test-public.voyager-demo.xyz
+      paths:
+        - path: /
+          pathType: Prefix
+
+# Mandatory: sample application runs on main node pool (not tools)
+resources:
+  limits:
+    cpu: 250m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+nodeSelector:
+  cloud.google.com/gke-nodepool: voyager-test-main-pool
+tolerations: []
+env:
+  ENV: "test"
+  POSTGRES_SERVER_HOST: "db.test-private.voyager-demo.xyz"
+
+clientUrl: "https://frontend.test-public.voyager-demo.xyz"
+
+externalSecrets:
+  enabled: true
+  secretStore: gcp-secret-manager
+  secretName: backend-db-credentials
